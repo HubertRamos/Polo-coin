@@ -1,0 +1,8 @@
+{
+  "name": "PoloCoin",
+  "description": "Sistema escolar de recompensas, avaliações de alunos e pontuação PoloCoin",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

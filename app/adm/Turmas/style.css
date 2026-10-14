@@ -1,0 +1,26 @@
+@import '/app/style.css';
+
+* {
+    margin: 0px;
+    padding: 0px;
+    box-sizing: border-box;
+}
+
+body {
+    min-height: 100vh;
+}
+
+button {
+    font-family: inherit;
+}
+
+/* Botões de ação nos cards */
+.card-turma__arrow {
+    font-size: 18px;
+    color: var(--color-primary);
+    transition: transform 0.2s;
+}
+
+.card-turma:hover .card-turma__arrow {
+    transform: translateX(4px);
+}

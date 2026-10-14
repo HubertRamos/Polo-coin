@@ -1,0 +1,301 @@
+@import '/app/style.css';
+
+/* ===== Cards de turma/aluno com ícone ===== */
+
+.card__header-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.card__icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.card__icon--blue {
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+    color: #fff;
+}
+
+.card__icon--green {
+    background: linear-gradient(135deg, var(--color-success), #059669);
+    color: #fff;
+}
+
+.card__icon--purple {
+    background: linear-gradient(135deg, var(--color-secondary), #7C3AED);
+    color: #fff;
+}
+
+.card__body {
+    flex: 1;
+    min-width: 0;
+}
+
+.card__title {
+    display: block;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+.card__meta {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.card__arrow {
+    color: var(--color-primary);
+    font-size: 1rem;
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+}
+
+.card__arrow--blue {
+    color: var(--color-primary);
+}
+
+.card__arrow--green {
+    color: var(--color-success);
+}
+
+.card--hover:hover .card__arrow {
+    transform: translateX(4px);
+}
+
+/* ===== Modal ===== */
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: 16px;
+}
+
+.modal-content {
+    background: #fff;
+    border-radius: 14px;
+    width: 100%;
+    max-width: 550px;
+    max-height: 85vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-title {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.modal-subtitle {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    display: block;
+    margin-top: 2px;
+}
+
+.modal-body {
+    padding: 16px 20px;
+}
+
+.modal-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    font-size: 0.9rem;
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.modal-section {
+    margin-bottom: 16px;
+}
+
+.modal-section-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 10px;
+}
+
+.text-muted {
+    color: var(--text-muted);
+}
+
+.text-xs {
+    font-size: 0.75rem;
+}
+
+/* Lista de avaliações no modal */
+.av-list-item {
+    background: var(--bg-subtle);
+    padding: 8px 10px;
+    border-radius: 6px;
+    margin-bottom: 5px;
+    font-size: 0.85rem;
+    border-left: 3px solid var(--color-primary);
+    line-height: 1.4;
+}
+
+.pts-badge {
+    color: var(--color-primary);
+    font-weight: 700;
+    margin-left: 4px;
+}
+
+/* Categorias de avaliação no modal */
+.modal-categorias {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+
+.modal-cat-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.modal-cat-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.modal-cat-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.btn-avaliacao-modal {
+    color: #fff;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 600;
+    transition: transform 0.15s ease;
+}
+
+.btn-avaliacao-modal:hover {
+    transform: scale(1.08);
+}
+
+/* Form de observação no modal */
+.modal-obs-form {
+    border-top: 1px solid var(--border-color);
+    padding-top: 12px;
+}
+
+.modal-obs-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.modal-obs-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.form-input--sm {
+    padding: 5px 8px;
+    font-size: 0.85rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 6px;
+    font-family: inherit;
+}
+
+.alert--sm {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+    margin: 4px 0;
+}
+
+.btn--sm {
+    padding: 6px 14px;
+    font-size: 0.85rem;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: opacity 0.2s ease;
+}
+
+.btn--sm:hover {
+    opacity: 0.9;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--color-secondary), #7C3AED);
+    color: #fff;
+}
+
+.btn-secondary {
+    background: var(--bg-subtle);
+    color: var(--text-secondary);
+}
+
+.btn-secondary:hover {
+    background: var(--border-color);
+}
+
+/* Responsivo modal */
+@media (max-width: 500px) {
+    .modal-content {
+        max-width: 100%;
+        border-radius: 10px;
+    }
+    .modal-header {
+        padding: 12px 14px;
+    }
+    .modal-body {
+        padding: 12px 14px;
+    }
+    .modal-info-grid {
+        grid-template-columns: 1fr;
+    }
+    .modal-obs-row {
+        flex-wrap: wrap;
+    }
+}

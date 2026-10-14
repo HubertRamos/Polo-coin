@@ -1,0 +1,15 @@
+@import '/app/style.css';
+
+* {
+    margin: 0px;
+    padding: 0px;
+    box-sizing: border-box;
+}
+
+body {
+    min-height: 100vh;
+}
+
+button {
+    font-family: inherit;
+}
