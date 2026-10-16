@@ -3480,10 +3480,20 @@ input[type="radio"] {
 }
 
 /* ============================================================
-   Impressão
+   Impressão & Relatórios A4
    ============================================================ */
 
+.print-only {
+    display: none !important;
+}
+
 @media print {
+    @page {
+        size: A4 portrait;
+        margin: 12mm 14mm 12mm 14mm;
+    }
+
+    .polocoin-header,
     .polocoin-sidebar,
     .polocoin-sidebar-toggle,
     .polocoin-sidebar-overlay,
@@ -3493,12 +3503,91 @@ input[type="radio"] {
         display: none !important;
     }
 
-    body { background: #fff; }
+    .print-only {
+        display: block !important;
+    }
 
-    .polocoin-main { padding: 0; }
+    body {
+        background: #ffffff !important;
+        color: #111827 !important;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+        font-size: 11pt !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+
+    .polocoin-layout {
+        display: block !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .polocoin-main {
+        padding: 0 !important;
+        margin: 0 !important;
+        max-width: 100% !important;
+        width: 100% !important;
+    }
 
     .card, .tabela-wrapper {
-        box-shadow: none;
-        border: 1px solid #ccc;
+        box-shadow: none !important;
+        border: 1px solid #cbd5e1 !important;
+    }
+
+    /* Modal print support (for RelatorioModal) */
+    .polocoin-modal-open { overflow: visible !important; }
+    .polocoin-modal-overlay {
+        position: static !important;
+        background: transparent !important;
+        padding: 0 !important;
+    }
+    .polocoin-modal-container {
+        box-shadow: none !important;
+        border: none !important;
+        max-height: none !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+    .polocoin-modal-close,
+    .polocoin-modal-footer {
+        display: none !important;
+    }
+    .polocoin-modal-body {
+        max-height: none !important;
+        overflow: visible !important;
+        padding: 0 !important;
+    }
+
+    /* Tabela de Relatório A4 */
+    .print-relatorio-tabela {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        margin-top: 10px !important;
+    }
+
+    .print-relatorio-tabela thead {
+        display: table-header-group !important;
+    }
+
+    .print-relatorio-tabela tr {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+
+    .print-relatorio-tabela th,
+    .print-relatorio-tabela td {
+        border: 1px solid #cbd5e1 !important;
+        padding: 7px 10px !important;
+        font-size: 10.5pt !important;
+        text-align: left !important;
+        vertical-align: middle !important;
+    }
+
+    .print-relatorio-tabela th {
+        background-color: #f1f5f9 !important;
+        color: #0f172a !important;
+        font-weight: 700 !important;
     }
 }

@@ -175,6 +175,8 @@ export const TurmasProfessorTab: React.FC = () => {
         </div>
       )}
 
+      
+
       {/* Modal de Avaliação do Aluno */}
       <AlunoPainelModal
         isOpen={!!alunoSelecionado}

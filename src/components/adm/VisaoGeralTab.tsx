@@ -28,10 +28,6 @@ export const VisaoGeralTab: React.FC<VisaoGeralTabProps> = ({ onNavigateTab }) =
     }
   };
 
-  const handleImprimir = () => {
-    window.print();
-  };
-
   return (
     <div>
       <div className="polocoin-main__header">
@@ -42,16 +38,13 @@ export const VisaoGeralTab: React.FC<VisaoGeralTabProps> = ({ onNavigateTab }) =
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button type="button" className="btn btn-secondary" onClick={handleImprimir}>
-            🖨️ Imprimir Resumo
-          </button>
-          {entregasConcluidas > 0 && (
+        {entregasConcluidas > 0 && (
+          <div style={{ display: 'flex', gap: '8px' }}>
             <button type="button" className="btn btn-secondary" onClick={handleOtimizarHistorico}>
               🧹 Arquivar Histórico Antigo
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Grid de Estatísticas Principais */}

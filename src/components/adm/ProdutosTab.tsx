@@ -19,6 +19,7 @@ export const ProdutosTab: React.FC = () => {
   const [custoPontos, setCustoPontos] = useState('');
   const [categoria, setCategoria] = useState('');
   const [novaCategoria, setNovaCategoria] = useState('');
+  const [estoque, setEstoque] = useState('');
 
   const produtosFiltrados = produtos.filter(p => {
     const matchBusca = p.nome.toLowerCase().includes(busca.toLowerCase());
@@ -31,6 +32,7 @@ export const ProdutosTab: React.FC = () => {
     setCustoPontos('');
     setCategoria(categorias[0]?.nome || 'Geral');
     setNovaCategoria('');
+    setEstoque('');
     setModalNovoAberto(true);
   };
 
@@ -40,6 +42,7 @@ export const ProdutosTab: React.FC = () => {
     setCustoPontos(String(p.custo_pontos));
     setCategoria(p.categoria);
     setNovaCategoria('');
+    setEstoque(p.estoque !== undefined ? String(p.estoque) : '');
   };
 
   const handleSalvarNovo = async (e: React.FormEvent) => {
@@ -54,7 +57,8 @@ export const ProdutosTab: React.FC = () => {
       return;
     }
 
-    await addProduto(nome, Number(custoPontos), catFinal);
+    const estoqueNum = estoque.trim() !== '' ? Number(estoque) : undefined;
+    await addProduto(nome, Number(custoPontos), catFinal, estoqueNum);
     toast.success('Produto cadastrado com sucesso!');
     setModalNovoAberto(false);
   };
@@ -68,7 +72,8 @@ export const ProdutosTab: React.FC = () => {
     }
     const catFinal = categoria === '__nova__' ? novaCategoria.trim() : categoria;
 
-    await updateProduto(produtoEditando.id, nome, Number(custoPontos), catFinal);
+    const estoqueNum = estoque.trim() !== '' ? Number(estoque) : undefined;
+    await updateProduto(produtoEditando.id, nome, Number(custoPontos), catFinal, estoqueNum);
     toast.success('Produto atualizado com sucesso!');
     setProdutoEditando(null);
   };
@@ -126,6 +131,14 @@ export const ProdutosTab: React.FC = () => {
             <div key={p.id} className="produto-card">
               <div className="produto-card__topo">
                 <span className="produto-card__categoria">{p.categoria}</span>
+                {p.estoque !== undefined && (
+                  <span
+                    className={`badge ${p.estoque > 0 ? 'badge-success' : 'badge-danger'}`}
+                    style={{ fontSize: '11px' }}
+                  >
+                    {p.estoque > 0 ? `${p.estoque} unid.` : 'Esgotado'}
+                  </span>
+                )}
               </div>
               <h3 className="produto-card__nome">{p.nome}</h3>
               <div className="produto-card__rodape">
@@ -175,6 +188,18 @@ export const ProdutosTab: React.FC = () => {
               value={custoPontos}
               onChange={e => setCustoPontos(e.target.value)}
               required
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Estoque Disponível (Opcional)</label>
+            <input
+              type="number"
+              min="0"
+              className="form-input"
+              placeholder="Deixe em branco para estoque ilimitado"
+              value={estoque}
+              onChange={e => setEstoque(e.target.value)}
             />
           </div>
 
@@ -251,6 +276,18 @@ export const ProdutosTab: React.FC = () => {
               value={custoPontos}
               onChange={e => setCustoPontos(e.target.value)}
               required
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Estoque Disponível (Opcional)</label>
+            <input
+              type="number"
+              min="0"
+              className="form-input"
+              placeholder="Deixe em branco para estoque ilimitado"
+              value={estoque}
+              onChange={e => setEstoque(e.target.value)}
             />
           </div>
 

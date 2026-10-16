@@ -33,9 +33,9 @@ interface DataContextType {
   carregarDados: () => Promise<void>;
 
   // Cart operations
-  addToCart: (produto: Produto) => void;
+  addToCart: (produto: Produto, quantidade?: number) => { success: boolean; error?: string };
   removeFromCart: (produtoId: number) => void;
-  updateCartQtd: (produtoId: number, delta: number) => void;
+  updateCartQtd: (produtoId: number, delta: number) => { success: boolean; error?: string };
   clearCart: () => void;
 
   // Turmas & Alunos
@@ -53,8 +53,8 @@ interface DataContextType {
   unlinkTurmaProfessor: (professorId: number, turmaId: number) => Promise<void>;
 
   // Produtos & Categorias
-  addProduto: (nome: string, custo_pontos: number, categoria: string) => Promise<Produto | null>;
-  updateProduto: (id: number, nome: string, custo_pontos: number, categoria: string) => Promise<void>;
+  addProduto: (nome: string, custo_pontos: number, categoria: string, estoque?: number) => Promise<Produto | null>;
+  updateProduto: (id: number, nome: string, custo_pontos: number, categoria: string, estoque?: number) => Promise<void>;
 
   // Avaliações
   addAvaliacao: (
@@ -67,7 +67,7 @@ interface DataContextType {
     professorId?: number,
     professorNome?: string
   ) => Promise<void>;
-  consentirAvaliacoes: (avaliacaoIds: number[]) => Promise<void>;
+  consentirAvaliacoes: (avaliacaoIds: number[], responsavelId?: number) => Promise<{ success: boolean; error?: string }>;
 
   // Desejos
   addDesejo: (alunoId: number, produtoId: number) => Promise<{ success: boolean; error?: string }>;
@@ -75,7 +75,7 @@ interface DataContextType {
   comprarDesejoPorResponsavel: (alunoId: number, produtoId: number, responsavelId: number) => Promise<{ success: boolean; error?: string }>;
 
   // Compras & Carrinho checkout
-  checkoutCarrinho: (alunoId: number) => Promise<{ success: boolean; error?: string; falta?: number }>;
+  checkoutCarrinho: (alunoId: number) => Promise<{ success: boolean; destino?: 'entregas' | 'desejos'; error?: string; falta?: number }>;
   comprarProdutoDireto: (alunoId: number, produtoId: number) => Promise<{ success: boolean; error?: string; falta?: number }>;
   marcarEntrega: (compraId: number) => Promise<void>;
   limparHistoricoVendas: () => Promise<void>;
@@ -201,7 +201,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             observacao: av.observacao || '',
             data: av.data || (av.created_at ? av.created_at.split('T')[0] : ''),
             hora: av.hora || (av.created_at ? av.created_at.substring(11, 16) : ''),
-            consentido: av.consentido ?? true,
+            consentido: av.consentido !== null && av.consentido !== undefined ? av.consentido : av.tipo === 'positiva',
           }))
         );
       }
@@ -247,34 +247,66 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [carregarDados]);
 
   // Cart operations
-  const addToCart = (produto: Produto) => {
+  const addToCart = (produto: Produto, quantidade = 1): { success: boolean; error?: string } => {
+    const qtdToAdd = Math.max(1, quantidade);
+
+    if (produto.estoque !== undefined) {
+      if (produto.estoque <= 0) {
+        return { success: false, error: `O produto "${produto.nome}" está esgotado no estoque.` };
+      }
+      const itemExistente = carrinho.find(item => item.produto.id === produto.id);
+      const qtdAtual = itemExistente ? itemExistente.quantidade : 0;
+      if (qtdAtual + qtdToAdd > produto.estoque) {
+        return {
+          success: false,
+          error: `Estoque insuficiente para "${produto.nome}". Disponível: ${produto.estoque} (você já possui ${qtdAtual} no carrinho).`,
+        };
+      }
+    }
+
     setCarrinho(prev => {
       const existing = prev.find(item => item.produto.id === produto.id);
       if (existing) {
         return prev.map(item =>
-          item.produto.id === produto.id ? { ...item, quantidade: item.quantidade + 1 } : item
+          item.produto.id === produto.id ? { ...item, quantidade: item.quantidade + qtdToAdd } : item
         );
       }
-      return [...prev, { produto, quantidade: 1 }];
+      return [...prev, { produto, quantidade: qtdToAdd }];
     });
+
+    return { success: true };
   };
 
   const removeFromCart = (produtoId: number) => {
     setCarrinho(prev => prev.filter(item => item.produto.id !== produtoId));
   };
 
-  const updateCartQtd = (produtoId: number, delta: number) => {
+  const updateCartQtd = (produtoId: number, delta: number): { success: boolean; error?: string } => {
+    const item = carrinho.find(i => i.produto.id === produtoId);
+    if (!item) return { success: false, error: 'Item não encontrado no carrinho.' };
+
+    if (delta > 0 && item.produto.estoque !== undefined) {
+      if (item.quantidade + delta > item.produto.estoque) {
+        return {
+          success: false,
+          error: `Limite de estoque atingido para "${item.produto.nome}" (${item.produto.estoque} unidades disponíveis).`,
+        };
+      }
+    }
+
     setCarrinho(prev =>
       prev
-        .map(item => {
-          if (item.produto.id === produtoId) {
-            const novaQtd = item.quantidade + delta;
-            return novaQtd > 0 ? { ...item, quantidade: novaQtd } : null;
+        .map(i => {
+          if (i.produto.id === produtoId) {
+            const novaQtd = i.quantidade + delta;
+            return novaQtd > 0 ? { ...i, quantidade: novaQtd } : null;
           }
-          return item;
+          return i;
         })
         .filter(Boolean) as CartItem[]
     );
+
+    return { success: true };
   };
 
   const clearCart = () => setCarrinho([]);
@@ -491,7 +523,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Produtos
-  const addProduto = async (nome: string, custo_pontos: number, categoria: string) => {
+  const addProduto = async (nome: string, custo_pontos: number, categoria: string, estoque?: number) => {
     const supabase = getSupabaseClient();
     const catClean = categoria.trim() || 'Geral';
 
@@ -503,18 +535,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
 
       if (data) {
-        const novo: Produto = { id: data.id, nome: data.nome, custo_pontos: data.custo_pontos, categoria: data.categoria };
+        const novo: Produto = { id: data.id, nome: data.nome, custo_pontos: data.custo_pontos, categoria: data.categoria, estoque };
         setProdutos(prev => [...prev, novo]);
         return novo;
       }
     }
 
-    const novoFallback: Produto = { id: Date.now(), nome: nome.trim(), custo_pontos, categoria: catClean };
+    const novoFallback: Produto = { id: Date.now(), nome: nome.trim(), custo_pontos, categoria: catClean, estoque };
     setProdutos(prev => [...prev, novoFallback]);
     return novoFallback;
   };
 
-  const updateProduto = async (id: number, nome: string, custo_pontos: number, categoria: string) => {
+  const updateProduto = async (id: number, nome: string, custo_pontos: number, categoria: string, estoque?: number) => {
     const supabase = getSupabaseClient();
     const catClean = categoria.trim() || 'Geral';
 
@@ -526,7 +558,17 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     setProdutos(prev =>
-      prev.map(p => (p.id === id ? { ...p, nome: nome.trim(), custo_pontos, categoria: catClean } : p))
+      prev.map(p =>
+        p.id === id
+          ? {
+              ...p,
+              nome: nome.trim(),
+              custo_pontos,
+              categoria: catClean,
+              estoque: estoque !== undefined ? estoque : p.estoque,
+            }
+          : p
+      )
     );
   };
 
@@ -635,14 +677,59 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
   };
 
-  const consentirAvaliacoes = async (avaliacaoIds: number[]) => {
+  const consentirAvaliacoes = async (
+    avaliacaoIds: number[],
+    responsavelId?: number
+  ): Promise<{ success: boolean; error?: string }> => {
+    if (!avaliacaoIds || avaliacaoIds.length === 0) {
+      return { success: true };
+    }
+
+    // Validação estrita de segurança: apenas permitir confirmar ocorrências dos alunos vinculados à conta do responsável
+    if (responsavelId) {
+      const filhosValidosIds = alunos.filter(a => a.responsavelId === responsavelId).map(a => a.id);
+      const invalidas = avaliacoes.filter(
+        av => avaliacaoIds.includes(av.id) && !filhosValidosIds.includes(av.alunoId)
+      );
+
+      if (invalidas.length > 0) {
+        return {
+          success: false,
+          error: 'Operação não permitida: você só pode confirmar ocorrências de alunos vinculados à sua conta.',
+        };
+      }
+    }
+
     const supabase = getSupabaseClient();
     if (supabase) {
-      await supabase.from('avaliacoes').update({ consentido: true }).in('id', avaliacaoIds);
+      try {
+        const { error } = await supabase
+          .from('avaliacoes')
+          .update({ consentido: true })
+          .in('id', avaliacaoIds);
+
+        if (error) {
+          console.error('[DataContext] Erro ao registrar consentimento no Supabase:', error);
+          return {
+            success: false,
+            error: 'Não foi possível salvar a ciência no banco de dados. Por favor, tente novamente.',
+          };
+        }
+      } catch (err: any) {
+        console.error('[DataContext] Falha na comunicação ao registrar consentimento:', err);
+        return {
+          success: false,
+          error: 'Erro de conexão com o servidor. Verifique sua conexão e tente novamente.',
+        };
+      }
     }
+
+    // Atualiza estado local apenas após confirmação de sucesso
     setAvaliacoes(prev =>
       prev.map(av => (avaliacaoIds.includes(av.id) ? { ...av, consentido: true } : av))
     );
+
+    return { success: true };
   };
 
   // Desejos
@@ -688,37 +775,33 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const comprarDesejoPorResponsavel = async (alunoId: number, produtoId: number, responsavelId: number) => {
     const aluno = alunos.find(a => a.id === alunoId);
     const produto = produtos.find(p => p.id === produtoId);
+    const desejo = desejos.find(d => d.alunoId === alunoId && d.produtoId === produtoId);
 
     if (!aluno || !produto) return { success: false, error: 'Aluno ou produto não encontrado.' };
-    if (aluno.pontos < produto.custo_pontos) {
-      return { success: false, error: `Saldo insuficiente (${aluno.pontos}/${produto.custo_pontos}).` };
+
+    const qtd = desejo?.quantidade && desejo.quantidade > 0 ? desejo.quantidade : 1;
+    const custoTotal = produto.custo_pontos * qtd;
+
+    if (produto.estoque !== undefined && produto.estoque < qtd) {
+      return {
+        success: false,
+        error: `Estoque insuficiente para "${produto.nome}" (disponível: ${produto.estoque}).`,
+      };
     }
 
-    const novoSaldo = aluno.pontos - produto.custo_pontos;
+    if (aluno.pontos < custoTotal) {
+      return { success: false, error: `Saldo insuficiente (${aluno.pontos}/${custoTotal} PoloCoins).` };
+    }
+
+    const novoSaldo = aluno.pontos - custoTotal;
     const agoraStr = new Date().toISOString().substring(0, 16).replace('T', ' ');
     const supabase = getSupabaseClient();
 
-    if (supabase) {
-      await supabase.from('alunos').update({ pontos: novoSaldo }).eq('id', alunoId);
-      await supabase.from('compras').insert([
-        {
-          aluno_id: alunoId,
-          produto_id: produtoId,
-          produto_nome: produto.nome,
-          custo_pontos: produto.custo_pontos,
-          categoria_nome: produto.categoria,
-          autorizado_por: responsavelId,
-          entregue: false,
-          criado_em: agoraStr,
-        },
-      ]);
-      await supabase.from('desejos').delete().eq('aluno_id', alunoId).eq('produto_id', produtoId);
-    }
-
-    setAlunos(prev => prev.map(a => (a.id === alunoId ? { ...a, pontos: novoSaldo } : a)));
-    setCompras(prev => [
-      {
-        id: Date.now(),
+    const novasCompras: Compra[] = [];
+    const insertsSupabase: any[] = [];
+    for (let i = 0; i < qtd; i++) {
+      novasCompras.push({
+        id: Date.now() + Math.random(),
         alunoId,
         produtoId,
         produtoNome: produto.nome,
@@ -727,77 +810,249 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         autorizadoPor: responsavelId,
         criadoEm: agoraStr,
         entregue: false,
-      },
-      ...prev,
-    ]);
+      });
+
+      insertsSupabase.push({
+        aluno_id: alunoId,
+        produto_id: produtoId,
+        produto_nome: produto.nome,
+        custo_pontos: produto.custo_pontos,
+        categoria_nome: produto.categoria,
+        autorizado_por: responsavelId,
+        entregue: false,
+        criado_em: agoraStr,
+      });
+    }
+
+    if (supabase) {
+      try {
+        const { error: errAluno } = await supabase.from('alunos').update({ pontos: novoSaldo }).eq('id', alunoId);
+        if (errAluno) {
+          console.error('[DataContext] Erro ao debitar saldo no Supabase:', errAluno);
+          return { success: false, error: 'Falha ao debitar saldo no servidor.' };
+        }
+        await supabase.from('compras').insert(insertsSupabase);
+        await supabase.from('desejos').delete().eq('aluno_id', alunoId).eq('produto_id', produtoId);
+      } catch (err: any) {
+        console.error('[DataContext] Erro no servidor:', err);
+        return { success: false, error: 'Falha de comunicação ao autorizar o resgate.' };
+      }
+    }
+
+    setAlunos(prev => prev.map(a => (a.id === alunoId ? { ...a, pontos: novoSaldo } : a)));
+    setCompras(prev => [...novasCompras, ...prev]);
+    if (produto.estoque !== undefined) {
+      setProdutos(prev =>
+        prev.map(p => (p.id === produtoId ? { ...p, estoque: Math.max(0, (p.estoque ?? 0) - qtd) } : p))
+      );
+    }
     removerDesejo(alunoId, produtoId);
     return { success: true };
   };
 
   // Compras & Carrinho checkout
-  const checkoutCarrinho = async (alunoId: number) => {
+  const checkoutCarrinho = async (
+    alunoId: number
+  ): Promise<{
+    success: boolean;
+    destino?: 'entregas' | 'desejos';
+    error?: string;
+    falta?: number;
+  }> => {
     const aluno = alunos.find(a => a.id === alunoId);
     if (!aluno) return { success: false, error: 'Aluno não encontrado.' };
 
-    if (!aluno.pode_comprar) {
-      return { success: false, error: 'Suas compras diretas estão pausadas pelo responsável.' };
+    if (carrinho.length === 0) {
+      return { success: false, error: 'Seu carrinho está vazio. Adicione recompensas na loja.' };
     }
 
+    // Validação de ocorrências disciplinares pendentes
     const temPendentes = avaliacoes.some(av => av.alunoId === alunoId && av.tipo === 'negativa' && !av.consentido);
     if (temPendentes) {
-      return { success: false, error: 'Você tem ocorrências pendentes de consentimento pelo responsável.' };
+      return {
+        success: false,
+        error: 'Você possui ocorrências disciplinares com pendência de ciência do seu responsável. Solicite a confirmação aos seus pais antes de concluir novos pedidos.',
+      };
+    }
+
+    // Validação de estoque para todos os itens do carrinho
+    for (const item of carrinho) {
+      if (item.produto.estoque !== undefined) {
+        if (item.produto.estoque <= 0) {
+          return {
+            success: false,
+            error: `O produto "${item.produto.nome}" está esgotado no estoque escolar.`,
+          };
+        }
+        if (item.quantidade > item.produto.estoque) {
+          return {
+            success: false,
+            error: `Estoque insuficiente para "${item.produto.nome}" (disponível: ${item.produto.estoque}, no carrinho: ${item.quantidade}).`,
+          };
+        }
+      }
     }
 
     const totalPontos = carrinho.reduce((sum, item) => sum + item.produto.custo_pontos * item.quantidade, 0);
-
-    if (aluno.pontos < totalPontos) {
-      const falta = totalPontos - aluno.pontos;
-      return { success: false, error: `Saldo insuficiente! Faltam 🪙 ${falta} PoloCoins.`, falta };
-    }
-
-    const novoSaldo = aluno.pontos - totalPontos;
     const agoraStr = new Date().toISOString().substring(0, 16).replace('T', ' ');
     const supabase = getSupabaseClient();
 
-    const novasCompras: Compra[] = [];
-    const insertsSupabase: any[] = [];
+    // ============================================================
+    // CASO A — Aluno liberado para compras autônomas (pode_comprar: true)
+    // ============================================================
+    if (aluno.pode_comprar) {
+      if (aluno.pontos < totalPontos) {
+        const falta = totalPontos - aluno.pontos;
+        return {
+          success: false,
+          error: `Saldo insuficiente! Você possui 🪙 ${aluno.pontos} PoloCoins e o total é 🪙 ${totalPontos}. Faltam 🪙 ${falta} PoloCoins.`,
+          falta,
+        };
+      }
+
+      const novoSaldo = aluno.pontos - totalPontos;
+      const novasCompras: Compra[] = [];
+      const insertsSupabase: any[] = [];
+
+      carrinho.forEach(item => {
+        for (let i = 0; i < item.quantidade; i++) {
+          novasCompras.push({
+            id: Date.now() + Math.random(),
+            alunoId,
+            produtoId: item.produto.id,
+            produtoNome: item.produto.nome,
+            custoPontos: item.produto.custo_pontos,
+            categoriaNome: item.produto.categoria,
+            autorizadoPor: null,
+            criadoEm: agoraStr,
+            entregue: false,
+          });
+
+          insertsSupabase.push({
+            aluno_id: alunoId,
+            produto_id: item.produto.id,
+            produto_nome: item.produto.nome,
+            custo_pontos: item.produto.custo_pontos,
+            categoria_nome: item.produto.categoria,
+            autorizado_por: null,
+            entregue: false,
+            criado_em: agoraStr,
+          });
+        }
+      });
+
+      if (supabase) {
+        try {
+          const { error: errSaldo } = await supabase.from('alunos').update({ pontos: novoSaldo }).eq('id', alunoId);
+          if (errSaldo) {
+            console.error('[DataContext] Erro ao debitar saldo no Supabase:', errSaldo);
+            return {
+              success: false,
+              error: 'Não foi possível debitar o saldo no servidor. Os itens foram mantidos no carrinho.',
+            };
+          }
+
+          const { error: errCompras } = await supabase.from('compras').insert(insertsSupabase);
+          if (errCompras) {
+            console.error('[DataContext] Erro ao registrar compras no Supabase:', errCompras);
+            // Reverter saldo em caso de falha nas compras
+            await supabase.from('alunos').update({ pontos: aluno.pontos }).eq('id', alunoId);
+            return {
+              success: false,
+              error: 'Falha ao registrar entrega pendente no servidor. Tente novamente.',
+            };
+          }
+        } catch (err: any) {
+          console.error('[DataContext] Erro de rede ao finalizar compra:', err);
+          return {
+            success: false,
+            error: 'Erro de conexão com o servidor. O carrinho foi preservado para nova tentativa.',
+          };
+        }
+      }
+
+      // Atualiza compras pendentes de entrega
+      setCompras(prev => [...novasCompras, ...prev]);
+      // Atualiza saldo do aluno
+      setAlunos(prev => prev.map(a => (a.id === alunoId ? { ...a, pontos: novoSaldo } : a)));
+      // Movimenta estoque se rastreado
+      setProdutos(prev =>
+        prev.map(p => {
+          const cartItem = carrinho.find(ci => ci.produto.id === p.id);
+          if (cartItem && p.estoque !== undefined) {
+            return { ...p, estoque: Math.max(0, p.estoque - cartItem.quantidade) };
+          }
+          return p;
+        })
+      );
+
+      clearCart();
+      return { success: true, destino: 'entregas' };
+    }
+
+    // ============================================================
+    // CASO B — Aluno NÃO liberado para compras autônomas (pode_comprar: false)
+    // Envia o pedido para a Lista de Desejos / Aprovação do Responsável
+    // NÃO deduz PoloCoins nem movimenta estoque
+    // ============================================================
+    const novosDesejos: Desejo[] = [];
+    const insertsSupabaseDesejos: any[] = [];
 
     carrinho.forEach(item => {
-      for (let i = 0; i < item.quantidade; i++) {
-        novasCompras.push({
+      const jaExiste = desejos.some(d => d.alunoId === alunoId && d.produtoId === item.produto.id);
+      if (!jaExiste) {
+        novosDesejos.push({
           id: Date.now() + Math.random(),
           alunoId,
           produtoId: item.produto.id,
-          produtoNome: item.produto.nome,
-          custoPontos: item.produto.custo_pontos,
-          categoriaNome: item.produto.categoria,
-          autorizadoPor: null,
           criadoEm: agoraStr,
-          entregue: false,
+          quantidade: item.quantidade,
         });
 
-        insertsSupabase.push({
+        insertsSupabaseDesejos.push({
           aluno_id: alunoId,
           produto_id: item.produto.id,
-          produto_nome: item.produto.nome,
-          custo_pontos: item.produto.custo_pontos,
-          categoria_nome: item.produto.categoria,
-          autorizado_por: null,
-          entregue: false,
           criado_em: agoraStr,
         });
       }
     });
 
-    if (supabase) {
-      await supabase.from('alunos').update({ pontos: novoSaldo }).eq('id', alunoId);
-      await supabase.from('compras').insert(insertsSupabase);
+    if (supabase && insertsSupabaseDesejos.length > 0) {
+      try {
+        const { error: errDesejo } = await supabase.from('desejos').insert(insertsSupabaseDesejos);
+        if (errDesejo) {
+          console.error('[DataContext] Erro ao registrar desejos no Supabase:', errDesejo);
+          return {
+            success: false,
+            error: 'Não foi possível encaminhar o pedido para a aprovação familiar no servidor. Tente novamente.',
+          };
+        }
+      } catch (err: any) {
+        console.error('[DataContext] Falha na comunicação ao registrar desejos:', err);
+        return {
+          success: false,
+          error: 'Falha de conexão com o servidor. Seus itens foram mantidos no carrinho.',
+        };
+      }
     }
 
-    setCompras(prev => [...novasCompras, ...prev]);
-    setAlunos(prev => prev.map(a => (a.id === alunoId ? { ...a, pontos: novoSaldo } : a)));
+    setDesejos(prev => {
+      let atualizados = [...prev];
+      carrinho.forEach(ci => {
+        const idx = atualizados.findIndex(d => d.alunoId === alunoId && d.produtoId === ci.produto.id);
+        if (idx !== -1) {
+          atualizados[idx] = {
+            ...atualizados[idx],
+            quantidade: (atualizados[idx].quantidade || 1) + ci.quantidade,
+            criadoEm: agoraStr,
+          };
+        }
+      });
+      return [...novosDesejos, ...atualizados];
+    });
+
     clearCart();
-    return { success: true };
+    return { success: true, destino: 'desejos' };
   };
 
   const comprarProdutoDireto = async (alunoId: number, produtoId: number) => {

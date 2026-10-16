@@ -8,7 +8,7 @@ export const FilhosTab: React.FC = () => {
   const { currentUser } = useAuth();
   const toast = useToast();
 
-  const meusFilhos = alunos.filter(a => a.responsavelId === currentUser?.id || currentUser?.id === 1);
+  const meusFilhos = alunos.filter(a => a.responsavelId === currentUser?.id);
 
   const handleTogglePodeComprar = async (alunoId: number, nome: string, statusAtual: boolean) => {
     await updateAlunoPodeComprar(alunoId, !statusAtual);

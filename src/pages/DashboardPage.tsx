@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useData } from '../context/DataContext';
 import { Header } from '../components/common/Header';
 import { Sidebar } from '../components/common/Sidebar';
 
@@ -25,9 +26,11 @@ import { PerfilAlunoTab } from '../components/aluno/PerfilAlunoTab';
 import { FilhosTab } from '../components/responsavel/FilhosTab';
 import { ConsentimentoTab } from '../components/responsavel/ConsentimentoTab';
 import { DesejosFilhosTab } from '../components/responsavel/DesejosFilhosTab';
+import { ConsentimentoModal } from '../components/responsavel/ConsentimentoModal';
 
 export const DashboardPage: React.FC = () => {
   const { currentUser } = useAuth();
+  const { avaliacoes, alunos } = useData();
   const role = currentUser?.tipo || 'aluno';
 
   const getDefaultTab = (currentRole: string) => {
@@ -47,11 +50,25 @@ export const DashboardPage: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<string>(() => getDefaultTab(role));
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [modalConsentimentoAberto, setModalConsentimentoAberto] = useState(false);
 
   // Sync default tab when role switches
   useEffect(() => {
     setActiveTab(getDefaultTab(role));
   }, [role]);
+
+  // Ao acessar o painel do responsável, verificar se existem ocorrências negativas que exigem confirmação/ciência
+  useEffect(() => {
+    if (role === 'responsavel' && currentUser?.id) {
+      const meusFilhosIds = alunos.filter(a => a.responsavelId === currentUser.id).map(a => a.id);
+      const temPendentes = avaliacoes.some(
+        av => meusFilhosIds.includes(av.alunoId) && av.tipo === 'negativa' && !av.consentido
+      );
+      if (temPendentes) {
+        setModalConsentimentoAberto(true);
+      }
+    }
+  }, [role, currentUser?.id, alunos, avaliacoes]);
 
   const renderContent = () => {
     if (role === 'adm') {
@@ -109,6 +126,7 @@ export const DashboardPage: React.FC = () => {
         case 'filhos':
           return <FilhosTab />;
         case 'consentimento':
+        case 'ocorrencias':
           return <ConsentimentoTab />;
         case 'desejos':
           return <DesejosFilhosTab />;
@@ -136,6 +154,14 @@ export const DashboardPage: React.FC = () => {
           {renderContent()}
         </main>
       </div>
+
+      {/* Pop-up obrigatório de ciência de ocorrências para responsáveis */}
+      {role === 'responsavel' && (
+        <ConsentimentoModal
+          isOpen={modalConsentimentoAberto}
+          onClose={() => setModalConsentimentoAberto(false)}
+        />
+      )}
     </div>
   );
 };

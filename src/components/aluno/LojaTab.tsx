@@ -6,13 +6,15 @@ import { CarrinhoModal } from './CarrinhoModal';
 import { useToast } from '../common/Toast';
 
 export const LojaTab: React.FC = () => {
-  const { produtos, categorias, carrinho, addToCart, comprarProdutoDireto, addDesejo, alunos } = useData();
+  const { produtos, categorias, carrinho, addToCart, alunos } = useData();
   const { currentUser } = useAuth();
   const toast = useToast();
 
   const [busca, setBusca] = useState('');
   const [categoriaSel, setCategoriaSel] = useState('todas');
   const [modalCarrinhoAberto, setModalCarrinhoAberto] = useState(false);
+  const [quantidades, setQuantidades] = useState<Record<number, number>>({});
+  const [adicionadoId, setAdicionadoId] = useState<number | null>(null);
 
   const aluno = alunos.find(a => a.id === currentUser?.id) || alunos[0];
 
@@ -25,29 +27,25 @@ export const LojaTab: React.FC = () => {
     return matchBusca && matchCat;
   });
 
-  const handleComprarDireto = async (p: Produto) => {
-    if (!aluno) return;
-    const res = await comprarProdutoDireto(aluno.id, p.id);
-    if (!res.success) {
-      toast.error(res.error || 'Erro ao comprar produto.');
-    } else {
-      toast.success(`Parabéns! Você resgatou "${p.nome}". Aguarde a entrega!`);
-    }
+  const setQtd = (produtoId: number, qtd: number) => {
+    setQuantidades(prev => ({ ...prev, [produtoId]: Math.max(1, qtd) }));
   };
 
   const handleAddToCart = (p: Produto) => {
-    addToCart(p);
-    toast.success(`"${p.nome}" adicionado ao seu carrinho!`);
-  };
-
-  const handlePedirDesejo = async (p: Produto) => {
-    if (!aluno) return;
-    const res = await addDesejo(aluno.id, p.id);
+    const qtd = quantidades[p.id] || 1;
+    const res = addToCart(p, qtd);
     if (!res.success) {
-      toast.warning(res.error || 'Não foi possível adicionar aos desejos.');
-    } else {
-      toast.success(`"${p.nome}" adicionado à sua lista de desejos! Seu responsável foi notificado.`);
+      toast.warning(res.error || 'Não foi possível adicionar ao carrinho.');
+      return;
     }
+
+    setAdicionadoId(p.id);
+    setTimeout(() => {
+      setAdicionadoId(prev => (prev === p.id ? null : prev));
+    }, 1200);
+
+    toast.success(`"${p.nome}" (${qtd}x) adicionado ao seu carrinho!`);
+    setQuantidades(prev => ({ ...prev, [p.id]: 1 }));
   };
 
   return (
@@ -89,11 +87,11 @@ export const LojaTab: React.FC = () => {
         </button>
       </div>
 
-      {/* Alerta se não puder comprar direto */}
+      {/* Alerta de supervisão familiar se aluno não tiver compras autônomas */}
       {aluno && !aluno.pode_comprar && (
-        <div className="alert alert-warning" style={{ marginBottom: '18px' }}>
+        <div className="alert alert-info" style={{ marginBottom: '18px' }}>
           <span>
-            ℹ️ <strong>Atenção:</strong> Suas compras diretas estão pausadas pelo seu responsável. Você pode adicionar os produtos à sua <strong>Lista de Desejos</strong> para que seu pai/mãe aprove e compre para você!
+            👨‍👩‍👧 <strong>Compras com aprovação familiar:</strong> Suas compras são supervisionadas pelos seus pais. Adicione os itens desejados ao carrinho e clique em <strong>"Confirmar compra"</strong> — o pedido será automaticamente encaminhado para autorização do seu responsável!
           </span>
         </div>
       )}
@@ -134,7 +132,10 @@ export const LojaTab: React.FC = () => {
       ) : (
         <div className="produtos-grid">
           {produtosFiltrados.map(p => {
-            const podeComprarDireto = aluno && aluno.pode_comprar && aluno.pontos >= p.custo_pontos;
+            const qtdSel = quantidades[p.id] || 1;
+            const semEstoque = p.estoque !== undefined && p.estoque <= 0;
+            const adicionadoRecente = adicionadoId === p.id;
+
             return (
               <div key={p.id} className="produto-card">
                 <div className="produto-card__topo">
@@ -146,36 +147,70 @@ export const LojaTab: React.FC = () => {
 
                 <h3 className="produto-card__nome">{p.nome}</h3>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: 'auto' }}>
+                {p.estoque !== undefined && (
+                  <div style={{ marginBottom: '10px' }}>
+                    {semEstoque ? (
+                      <span className="badge badge-danger">Esgotado</span>
+                    ) : (
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                        Estoque disponível: <strong>{p.estoque}</strong>
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {/* Seletor de quantidade no próprio card */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      background: 'var(--bg-subtle)',
+                      borderRadius: '8px',
+                      padding: '4px 8px',
+                    }}
+                  >
+                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Qtd:</span>
+                    <div className="carrinho-qtd" style={{ margin: 0 }}>
+                      <button
+                        type="button"
+                        className="carrinho-qtd__btn"
+                        onClick={() => setQtd(p.id, qtdSel - 1)}
+                        disabled={semEstoque || qtdSel <= 1}
+                        title="Diminuir quantidade"
+                      >
+                        -
+                      </button>
+                      <span className="carrinho-qtd__valor">{qtdSel}</span>
+                      <button
+                        type="button"
+                        className="carrinho-qtd__btn"
+                        onClick={() => {
+                          if (p.estoque !== undefined && qtdSel >= p.estoque) {
+                            toast.warning(`Limite de estoque atingido (${p.estoque} disponíveis).`);
+                            return;
+                          }
+                          setQtd(p.id, qtdSel + 1);
+                        }}
+                        disabled={semEstoque || (p.estoque !== undefined && qtdSel >= p.estoque)}
+                        title="Aumentar quantidade"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Único botão da apresentação do produto */}
                   <button
                     type="button"
-                    className="btn btn-primary btn--sm"
+                    className={`btn ${adicionadoRecente ? 'btn-success' : 'btn-primary'} btn--sm`}
                     onClick={() => handleAddToCart(p)}
+                    disabled={semEstoque}
+                    title={semEstoque ? 'Produto indisponível no estoque' : 'Adicionar este produto ao carrinho'}
                   >
-                    🛒 Adicionar ao Carrinho
+                    {adicionadoRecente ? '✓ Adicionado ao carrinho!' : '🛒 Ir para o carrinho'}
                   </button>
-
-                  <div style={{ display: 'flex', gap: '6px' }}>
-                    <button
-                      type="button"
-                      className="btn btn-success btn--sm"
-                      style={{ flex: 1 }}
-                      onClick={() => handleComprarDireto(p)}
-                      disabled={!podeComprarDireto}
-                      title={!podeComprarDireto ? 'Saldo insuficiente ou compra direta bloqueada' : 'Resgatar agora'}
-                    >
-                      ⚡ Resgatar
-                    </button>
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn--sm"
-                      style={{ flex: 1 }}
-                      onClick={() => handlePedirDesejo(p)}
-                      title="Pedir para o responsável autorizar a compra"
-                    >
-                      ✨ Desejo
-                    </button>
-                  </div>
                 </div>
               </div>
             );

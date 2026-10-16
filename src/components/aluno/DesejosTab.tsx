@@ -2,9 +2,10 @@ import React from 'react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../common/Toast';
+import { Produto } from '../../types';
 
 export const DesejosTab: React.FC = () => {
-  const { desejos, produtos, alunos, removerDesejo, comprarProdutoDireto } = useData();
+  const { desejos, produtos, alunos, removerDesejo, addToCart } = useData();
   const { currentUser } = useAuth();
   const toast = useToast();
 
@@ -14,35 +15,33 @@ export const DesejosTab: React.FC = () => {
   const handleRemover = (produtoId: number, produtoNome: string) => {
     if (aluno) {
       removerDesejo(aluno.id, produtoId);
-      toast.info(`"${produtoNome}" foi removido da sua lista de desejos.`);
+      toast.info(`"${produtoNome}" foi removido da sua lista de pedidos pendentes.`);
     }
   };
 
-  const handleResgatarAgora = async (produtoId: number) => {
-    if (!aluno) return;
-    const res = await comprarProdutoDireto(aluno.id, produtoId);
+  const handleMoverParaCarrinho = (prod: Produto, qtd = 1) => {
+    const res = addToCart(prod, qtd);
     if (!res.success) {
-      toast.error(res.error || 'Erro ao resgatar item.');
-    } else {
-      removerDesejo(aluno.id, produtoId);
-      toast.success('Parabéns! O item foi resgatado com sucesso!');
+      toast.warning(res.error || 'Não foi possível adicionar ao carrinho.');
+      return;
     }
+    toast.success(`"${prod.nome}" adicionado ao seu carrinho!`);
   };
 
   return (
     <div>
       <div className="polocoin-main__header">
         <div>
-          <h1 className="polocoin-main__title">Minha Lista de Desejos</h1>
+          <h1 className="polocoin-main__title">Minha Lista de Desejos & Pedidos</h1>
           <p className="polocoin-main__subtitle">
-            Itens que você pediu para seus pais ou responsáveis aprovarem e comprarem
+            Acompanhe pedidos enviados que aguardam autorização e resgate pelos seus responsáveis
           </p>
         </div>
       </div>
 
       <div className="alert alert-info" style={{ marginBottom: '20px' }}>
         <span>
-          💡 <strong>Como funciona:</strong> Ao adicionar um item aos desejos, seu responsável pode visualizar e autorizar o resgate diretamente no painel familiar, usando seus PoloCoins acumulados.
+          💡 <strong>Como funciona:</strong> Os itens adicionados aqui foram encaminhados pelo carrinho e estão aguardando a aprovação do seu responsável no painel familiar. Nenhum PoloCoin foi debitado até que seus pais aprovem o resgate.
         </span>
       </div>
 
@@ -51,15 +50,17 @@ export const DesejosTab: React.FC = () => {
           <div className="empty-state__icon">✨</div>
           <div className="empty-state__text">Sua lista de desejos está vazia.</div>
           <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '6px' }}>
-            Vá até a Loja PoloCoin e clique no botão "✨ Desejo" nos itens que você gostaria de ganhar!
+            Monte seu pedido na <strong>Loja PoloCoin</strong> e clique em <strong>"Confirmar compra"</strong> no carrinho para enviar recompensas para autorização familiar!
           </p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
           {meusDesejos.map(d => {
             const prod = produtos.find(p => p.id === d.produtoId);
             if (!prod) return null;
-            const saldoSuficiente = aluno && aluno.pontos >= prod.custo_pontos;
+            const qtd = d.quantidade && d.quantidade > 0 ? d.quantidade : 1;
+            const custoTotal = prod.custo_pontos * qtd;
+            const saldoSuficiente = aluno && aluno.pontos >= custoTotal;
 
             return (
               <div key={d.id} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -68,14 +69,26 @@ export const DesejosTab: React.FC = () => {
                   <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{d.criadoEm}</span>
                 </div>
 
-                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800 }}>{prod.nome}</h3>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800 }}>
+                    {prod.nome} {qtd > 1 && <span style={{ color: 'var(--color-primary)' }}>({qtd}x)</span>}
+                  </h3>
+                  <div style={{ marginTop: '6px' }}>
+                    <span className="badge badge-warning" style={{ fontSize: '11px' }}>
+                      ⏳ Aguardando aprovação dos pais
+                    </span>
+                  </div>
+                </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-coin-dark)' }}>
-                    🪙 {prod.custo_pontos} PoloCoins
-                  </span>
-                  <span className={`badge ${saldoSuficiente ? 'badge-success' : 'badge-warning'}`}>
-                    {saldoSuficiente ? 'Saldo OK' : `Faltam ${prod.custo_pontos - (aluno?.pontos || 0)}`}
+                  <div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Custo total:</div>
+                    <span style={{ fontSize: '18px', fontWeight: 900, color: 'var(--color-coin-dark)' }}>
+                      🪙 {custoTotal} PoloCoins
+                    </span>
+                  </div>
+                  <span className={`badge ${saldoSuficiente ? 'badge-success' : 'badge-danger'}`}>
+                    {saldoSuficiente ? 'Saldo OK' : `Faltam ${custoTotal - (aluno?.pontos || 0)}`}
                   </span>
                 </div>
 
@@ -86,18 +99,18 @@ export const DesejosTab: React.FC = () => {
                     style={{ flex: 1 }}
                     onClick={() => handleRemover(prod.id, prod.nome)}
                   >
-                    Remover
+                    Cancelar Pedido
                   </button>
 
                   {aluno?.pode_comprar && (
                     <button
                       type="button"
-                      className="btn btn-success btn--sm"
+                      className="btn btn-primary btn--sm"
                       style={{ flex: 1 }}
-                      onClick={() => handleResgatarAgora(prod.id)}
-                      disabled={!saldoSuficiente}
+                      onClick={() => handleMoverParaCarrinho(prod, qtd)}
+                      title="Mover de volta para o carrinho para compra autônoma"
                     >
-                      Resgatar Agora
+                      🛒 Ir para o carrinho
                     </button>
                   )}
                 </div>

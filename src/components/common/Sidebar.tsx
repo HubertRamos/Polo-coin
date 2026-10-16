@@ -190,11 +190,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           <button
             type="button"
-            className={`polocoin-sidebar__btn ${activeTab === 'consentimento' ? 'polocoin-sidebar__btn--active' : ''}`}
+            className={`polocoin-sidebar__btn ${activeTab === 'consentimento' || activeTab === 'ocorrencias' ? 'polocoin-sidebar__btn--active' : ''}`}
             onClick={() => { onSelectTab('consentimento'); onCloseMobile?.(); }}
           >
-            <span className="polocoin-sidebar__btn-icon">🛡️</span>
-            <span className="polocoin-sidebar__btn-label">Consentir Ocorrências</span>
+            <span className="polocoin-sidebar__btn-icon">📜</span>
+            <span className="polocoin-sidebar__btn-label">Ocorrências dos Filhos</span>
             {pendingConsentCount > 0 && (
               <span className="polocoin-sidebar__btn-badge" style={{ background: 'var(--color-danger)' }}>
                 {pendingConsentCount}

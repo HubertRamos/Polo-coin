@@ -46,6 +46,7 @@ export interface Produto {
   custo_pontos: number;
   categoria: string;
   imagem?: string;
+  estoque?: number;
 }
 
 export interface Categoria {
@@ -85,6 +86,7 @@ export interface Desejo {
   alunoId: number;
   produtoId: number;
   criadoEm: string;
+  quantidade?: number;
 }
 
 export interface OpcaoAvaliacao {
