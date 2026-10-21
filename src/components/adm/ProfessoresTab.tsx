@@ -3,22 +3,29 @@ import { useData } from '../../context/DataContext';
 import { Professor } from '../../types';
 import { Modal } from '../common/Modal';
 import { useToast } from '../common/Toast';
+import { ImportarPlanilhaModal } from './ImportarPlanilhaModal';
+
+import { validarDuplicidadeProfessor, normalizarUsuario } from '../../lib/duplicateValidation';
 
 export const ProfessoresTab: React.FC = () => {
   const { professores, turmas, addProfessor, updateProfessor } = useData();
   const toast = useToast();
 
   const [modalNovo, setModalNovo] = useState(false);
+  const [modalImportarAberto, setModalImportarAberto] = useState(false);
   const [professorEditando, setProfessorEditando] = useState<Professor | null>(null);
 
   const [name, setName] = useState('');
   const [usuario, setUsuario] = useState('');
   const [password, setPassword] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const [erroDuplicidade, setErroDuplicidade] = useState('');
 
   const abrirModalNovo = () => {
     setName('');
     setUsuario('');
     setPassword('');
+    setErroDuplicidade('');
     setModalNovo(true);
   };
 
@@ -27,17 +34,41 @@ export const ProfessoresTab: React.FC = () => {
     setName(p.name);
     setUsuario(p.usuario);
     setPassword(p.password || '');
+    setErroDuplicidade('');
   };
 
   const handleSalvarNovo = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErroDuplicidade('');
+
     if (!name.trim()) {
       toast.warning('Informe o nome do professor.');
       return;
     }
-    await addProfessor(name, usuario, password || '123');
-    toast.success('Professor cadastrado com sucesso!');
-    setModalNovo(false);
+
+    // Calcula o usuário efetivo que será utilizado
+    const userFinal = normalizarUsuario(usuario) || normalizarUsuario(name.trim().replace(/\s+/g, '.'));
+    const validacao = validarDuplicidadeProfessor({ usuario: userFinal, name: name.trim() }, professores);
+
+    if (validacao.isDuplicate) {
+      const msg = validacao.message || `Já existe um professor cadastrado com este usuário (@${userFinal}).`;
+      setErroDuplicidade(msg);
+      toast.error(msg);
+      return;
+    }
+
+    setSalvando(true);
+    try {
+      await addProfessor(name, usuario, password || '123');
+      toast.success('Professor cadastrado com sucesso!');
+      setModalNovo(false);
+    } catch (err: any) {
+      const msg = err?.message || 'Falha ao cadastrar professor.';
+      setErroDuplicidade(msg);
+      toast.error(msg);
+    } finally {
+      setSalvando(false);
+    }
   };
 
   const handleSalvarEditar = async (e: React.FormEvent) => {
@@ -47,9 +78,17 @@ export const ProfessoresTab: React.FC = () => {
       toast.warning('Informe o nome do professor.');
       return;
     }
-    await updateProfessor(professorEditando.id, name, password);
-    toast.success('Professor atualizado com sucesso!');
-    setProfessorEditando(null);
+
+    setSalvando(true);
+    try {
+      await updateProfessor(professorEditando.id, name, password);
+      toast.success('Professor atualizado com sucesso!');
+      setProfessorEditando(null);
+    } catch (err: any) {
+      toast.error(err?.message || 'Falha ao atualizar professor.');
+    } finally {
+      setSalvando(false);
+    }
   };
 
   return (
@@ -61,9 +100,19 @@ export const ProfessoresTab: React.FC = () => {
             Cadastre professores e visualize as turmas vinculadas para atribuição de pontos
           </p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={abrirModalNovo}>
-          <span>➕</span> Novo Professor
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => setModalImportarAberto(true)}
+            title="Importar professores por planilha Excel (.xlsx) ou CSV (.csv)"
+          >
+            <span>📥</span> Importar por Planilha
+          </button>
+          <button type="button" className="btn btn-primary" onClick={abrirModalNovo}>
+            <span>➕</span> Novo Professor
+          </button>
+        </div>
       </div>
 
       <div className="tabela-wrapper">
@@ -163,16 +212,23 @@ export const ProfessoresTab: React.FC = () => {
             />
           </div>
 
+          {erroDuplicidade && (
+            <div className="alert alert-danger" style={{ marginBottom: '14px', fontSize: '13px' }}>
+              <span>⚠️ {erroDuplicidade}</span>
+            </div>
+          )}
+
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
             <button
               type="button"
               className="btn btn-secondary"
               onClick={() => setModalNovo(false)}
+              disabled={salvando}
             >
               Cancelar
             </button>
-            <button type="submit" className="btn btn-primary">
-              Cadastrar
+            <button type="submit" className="btn btn-primary" disabled={salvando}>
+              {salvando ? 'Cadastrando...' : 'Cadastrar'}
             </button>
           </div>
         </form>
@@ -222,6 +278,13 @@ export const ProfessoresTab: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Modal de Importação em Massa por Planilha */}
+      <ImportarPlanilhaModal
+        isOpen={modalImportarAberto}
+        onClose={() => setModalImportarAberto(false)}
+        tipo="professores"
+      />
     </div>
   );
 };

@@ -10,10 +10,12 @@ import { ProdutosTab } from '../components/adm/ProdutosTab';
 import { EntregasTab } from '../components/adm/EntregasTab';
 import { ProfessoresTab } from '../components/adm/ProfessoresTab';
 import { TurmasTab } from '../components/adm/TurmasTab';
+import { MovimentacaoAlunosTab } from '../components/adm/MovimentacaoAlunosTab';
 
 // Professor Tabs
 import { TurmasProfessorTab } from '../components/professor/TurmasProfessorTab';
 import { PerfilProfessorTab } from '../components/professor/PerfilProfessorTab';
+import { OcorrenciasProfessorTab } from '../components/professor/OcorrenciasProfessorTab';
 
 // Aluno Tabs
 import { LojaTab } from '../components/aluno/LojaTab';
@@ -83,6 +85,8 @@ export const DashboardPage: React.FC = () => {
           return <ProfessoresTab />;
         case 'turmas':
           return <TurmasTab />;
+        case 'movimentacoes':
+          return <MovimentacaoAlunosTab />;
         default:
           return <VisaoGeralTab onNavigateTab={setActiveTab} />;
       }
@@ -92,6 +96,8 @@ export const DashboardPage: React.FC = () => {
       switch (activeTab) {
         case 'turmas':
           return <TurmasProfessorTab />;
+        case 'ocorrencias-personalizadas':
+          return <OcorrenciasProfessorTab />;
         case 'perfil':
           return <PerfilProfessorTab />;
         default:

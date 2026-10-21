@@ -4,11 +4,28 @@ import { useAuth } from '../../context/AuthContext';
 import { Produto } from '../../types';
 import { CarrinhoModal } from './CarrinhoModal';
 import { useToast } from '../common/Toast';
+import { getCategoriaIcone } from '../../data/categoriaProdutos';
+import { INITIAL_CATEGORIAS } from '../../data/initialData';
 
 export const LojaTab: React.FC = () => {
-  const { produtos, categorias, carrinho, addToCart, alunos } = useData();
+  const { produtos, categorias: categoriasData, carrinho, addToCart, alunos } = useData();
   const { currentUser } = useAuth();
   const toast = useToast();
+
+  const categorias = React.useMemo(() => {
+    if (!categoriasData || categoriasData.length === 0) {
+      return INITIAL_CATEGORIAS;
+    }
+    const mapa = new Map<string, { id: number; nome: string }>();
+    INITIAL_CATEGORIAS.forEach(c => mapa.set(c.nome.trim().toLowerCase(), c));
+    categoriasData.forEach(c => {
+      const chave = (c.nome || '').trim().toLowerCase();
+      if (chave && !mapa.has(chave)) {
+        mapa.set(chave, c);
+      }
+    });
+    return Array.from(mapa.values());
+  }, [categoriasData]);
 
   const [busca, setBusca] = useState('');
   const [categoriaSel, setCategoriaSel] = useState('todas');
@@ -23,7 +40,9 @@ export const LojaTab: React.FC = () => {
 
   const produtosFiltrados = produtos.filter(p => {
     const matchBusca = p.nome.toLowerCase().includes(busca.toLowerCase());
-    const matchCat = categoriaSel === 'todas' || p.categoria === categoriaSel;
+    const matchCat =
+      categoriaSel === 'todas' ||
+      (p.categoria && p.categoria.trim().toLowerCase() === categoriaSel.trim().toLowerCase());
     return matchBusca && matchCat;
   });
 
@@ -96,6 +115,86 @@ export const LojaTab: React.FC = () => {
         </div>
       )}
 
+      {/* Barra de Categorias */}
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '8px',
+          alignItems: 'center',
+          marginBottom: '16px',
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setCategoriaSel('todas')}
+          className={`btn ${categoriaSel === 'todas' ? 'btn-primary' : 'btn-secondary'}`}
+          style={{
+            padding: '7px 13px',
+            borderRadius: '20px',
+            fontSize: '12px',
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+          }}
+        >
+          <span>✨</span>
+          <span>Todas</span>
+          <span
+            style={{
+              background: categoriaSel === 'todas' ? 'rgba(255,255,255,0.25)' : 'var(--bg-subtle)',
+              padding: '2px 6px',
+              borderRadius: '10px',
+              fontSize: '10.5px',
+              fontWeight: 800,
+            }}
+          >
+            {produtos.length}
+          </span>
+        </button>
+
+        {categorias.map(c => {
+          const count = produtos.filter(
+            p => (p.categoria || '').trim().toLowerCase() === c.nome.trim().toLowerCase()
+          ).length;
+          const isAtiva = categoriaSel.trim().toLowerCase() === c.nome.trim().toLowerCase();
+          const icone = getCategoriaIcone(c.nome);
+
+          return (
+            <button
+              key={c.id || c.nome}
+              type="button"
+              onClick={() => setCategoriaSel(isAtiva ? 'todas' : c.nome)}
+              className={`btn ${isAtiva ? 'btn-primary' : 'btn-secondary'}`}
+              style={{
+                padding: '7px 13px',
+                borderRadius: '20px',
+                fontSize: '12px',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <span>{icone}</span>
+              <span>{c.nome}</span>
+              <span
+                style={{
+                  background: isAtiva ? 'rgba(255,255,255,0.25)' : 'var(--bg-subtle)',
+                  padding: '2px 6px',
+                  borderRadius: '10px',
+                  fontSize: '10.5px',
+                  fontWeight: 800,
+                }}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Filtros da Loja */}
       <div className="loja-filtros">
         <div className="loja-filtros__busca">
@@ -113,10 +212,10 @@ export const LojaTab: React.FC = () => {
             value={categoriaSel}
             onChange={e => setCategoriaSel(e.target.value)}
           >
-            <option value="todas">Todas as Categorias</option>
+            <option value="todas">✨ Todas as Categorias</option>
             {categorias.map(c => (
               <option key={c.id} value={c.nome}>
-                {c.nome}
+                {getCategoriaIcone(c.nome)} {c.nome}
               </option>
             ))}
           </select>

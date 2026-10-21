@@ -38,13 +38,23 @@ export const VisaoGeralTab: React.FC<VisaoGeralTabProps> = ({ onNavigateTab }) =
           </p>
         </div>
 
-        {entregasConcluidas > 0 && (
-          <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          {onNavigateTab && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => onNavigateTab('movimentacoes')}
+              title="Transferência entre turmas e progressão de fim de ano"
+            >
+              <span>🔄</span> Movimentar Alunos
+            </button>
+          )}
+          {entregasConcluidas > 0 && (
             <button type="button" className="btn btn-secondary" onClick={handleOtimizarHistorico}>
               🧹 Arquivar Histórico Antigo
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Grid de Estatísticas Principais */}
@@ -57,11 +67,6 @@ export const VisaoGeralTab: React.FC<VisaoGeralTabProps> = ({ onNavigateTab }) =
         <div className="stat-card stat-card--success">
           <div className="stat-card__label">Turmas Ativas</div>
           <div className="stat-card__value">{totalTurmas}</div>
-        </div>
-
-        <div className="stat-card stat-card--warning">
-          <div className="stat-card__label">PoloCoins em Circulação</div>
-          <div className="stat-card__value">🪙 {saldoTotalCirculante}</div>
         </div>
 
         <div className="stat-card stat-card--danger">
@@ -204,61 +209,6 @@ export const VisaoGeralTab: React.FC<VisaoGeralTabProps> = ({ onNavigateTab }) =
             </div>
           )}
         </div>
-      </div>
-
-      {/* Feed de Atividades Pedagógicas Recentes */}
-      <div className="card">
-        <h3 className="card-title" style={{ marginBottom: '14px' }}>
-          Atividades Pedagógicas Recentes
-        </h3>
-
-        {ultimasAvaliacoes.length === 0 ? (
-          <div className="empty-state" style={{ padding: '24px 0' }}>
-            <div className="empty-state__icon">📝</div>
-            <div className="empty-state__text">Nenhuma avaliação ou ocorrência registrada recentemente.</div>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {ultimasAvaliacoes.map(av => {
-              const aluno = alunos.find(a => a.id === av.alunoId);
-              return (
-                <div
-                  key={av.id}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '10px 14px',
-                    borderRadius: '10px',
-                    background: 'var(--bg-subtle)',
-                    borderLeft: `4px solid ${av.tipo === 'positiva' ? 'var(--color-success)' : 'var(--color-danger)'}`,
-                  }}
-                >
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <strong style={{ fontSize: '13.5px' }}>{aluno?.nome || 'Aluno'}</strong>
-                      <span className={`badge ${av.tipo === 'positiva' ? 'badge-success' : 'badge-danger'}`}>
-                        {av.tipo === 'positiva' ? `+${av.pontos} pts` : `-${av.pontos} pts`}
-                      </span>
-                      <span style={{ fontSize: '12.5px', color: 'var(--text-secondary)' }}>
-                        • {av.valor} ({av.categoria})
-                      </span>
-                    </div>
-                    {av.observacao && (
-                      <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px', fontStyle: 'italic' }}>
-                        "{av.observacao}"
-                      </div>
-                    )}
-                  </div>
-
-                  <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                    {av.data} {av.hora ? `às ${av.hora}` : ''}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
       </div>
     </div>
   );

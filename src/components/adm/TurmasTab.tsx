@@ -3,9 +3,12 @@ import { useData } from '../../context/DataContext';
 import { Turma, Aluno } from '../../types';
 import { Modal } from '../common/Modal';
 import { useToast } from '../common/Toast';
+import { ImportarPlanilhaModal } from './ImportarPlanilhaModal';
+
+import { validarDuplicidadeAluno } from '../../lib/duplicateValidation';
 
 export const TurmasTab: React.FC = () => {
-  const { turmas, alunos, responsaveis, addTurma, addAluno, updateAluno } = useData();
+  const { turmas, alunos, responsaveis, addTurma, addAluno, updateAluno, updateResponsavel } = useData();
   const toast = useToast();
 
   const [turmaSelecionada, setTurmaSelecionada] = useState<Turma | null>(turmas[0] || null);
@@ -19,21 +22,31 @@ export const TurmasTab: React.FC = () => {
   // Modais
   const [modalNovaTurma, setModalNovaTurma] = useState(false);
   const [modalNovoAluno, setModalNovoAluno] = useState(false);
+  const [modalImportarAberto, setModalImportarAberto] = useState(false);
   const [alunoEditando, setAlunoEditando] = useState<Aluno | null>(null);
 
   // Form states nova turma
   const [serie, setSerie] = useState('1');
   const [letraTurma, setLetraTurma] = useState('A');
+  const [anoLetivoTurma, setAnoLetivoTurma] = useState(2026);
 
   // Form states novo aluno
   const [nomeAluno, setNomeAluno] = useState('');
+  const [matriculaAluno, setMatriculaAluno] = useState('');
   const [nomeResponsavel, setNomeResponsavel] = useState('');
   const [senhaAluno, setSenhaAluno] = useState('123');
+  const [salvandoAluno, setSalvandoAluno] = useState(false);
+  const [erroAluno, setErroAluno] = useState('');
 
-  // Form states editar aluno
+  // Form states editar aluno e responsável
   const [editNome, setEditNome] = useState('');
-  const [editPontos, setEditPontos] = useState('0');
-  const [editPodeComprar, setEditPodeComprar] = useState(true);
+  const [editMatricula, setEditMatricula] = useState('');
+  const [editSenhaAluno, setEditSenhaAluno] = useState('');
+  const [editNomeResponsavel, setEditNomeResponsavel] = useState('');
+  const [editSenhaResponsavel, setEditSenhaResponsavel] = useState('');
+  const [mostrarSenhaAluno, setMostrarSenhaAluno] = useState(false);
+  const [mostrarSenhaResponsavel, setMostrarSenhaResponsavel] = useState(false);
+  const [erroEditAluno, setErroEditAluno] = useState('');
 
   const alunosDaTurma = turmaSelecionada
     ? alunos.filter(a => a.turmaId === turmaSelecionada.id)
@@ -45,43 +58,174 @@ export const TurmasTab: React.FC = () => {
       toast.warning('Preencha a série e a identificação da turma.');
       return;
     }
-    await addTurma(Number(serie), letraTurma);
-    toast.success(`Turma ${serie}º Ano ${letraTurma.toUpperCase()} criada com sucesso!`);
+    const ano = Number(anoLetivoTurma) || 2026;
+    await addTurma(Number(serie), letraTurma, ano);
+    toast.success(`Turma ${serie}º Ano ${letraTurma.toUpperCase()} (${ano}) criada com sucesso!`);
     setModalNovaTurma(false);
+  };
+
+  const abrirModalNovoAluno = () => {
+    setNomeAluno('');
+    setMatriculaAluno('');
+    setNomeResponsavel('');
+    setSenhaAluno('123');
+    setErroAluno('');
+    setModalNovoAluno(true);
   };
 
   const handleSalvarAluno = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErroAluno('');
+
     if (!turmaSelecionada) return;
     if (!nomeAluno.trim() || !nomeResponsavel.trim()) {
       toast.warning('Informe o nome do aluno e do responsável.');
       return;
     }
-    await addAluno(turmaSelecionada.id, nomeAluno, nomeResponsavel, senhaAluno || '123');
-    toast.success(`Aluno ${nomeAluno} cadastrado na turma com sucesso!`);
-    setNomeAluno('');
-    setNomeResponsavel('');
-    setSenhaAluno('123');
-    setModalNovoAluno(false);
+
+    // Validação de duplicidade antes do envio
+    const validacao = validarDuplicidadeAluno(
+      {
+        nome: nomeAluno.trim(),
+        turmaId: turmaSelecionada.id,
+        matricula: matriculaAluno.trim() || undefined,
+      },
+      alunos
+    );
+
+    if (validacao.isDuplicate) {
+      const msg = validacao.message || 'Aluno ou matrícula já cadastrada.';
+      setErroAluno(msg);
+      toast.error(msg);
+      return;
+    }
+
+    setSalvandoAluno(true);
+    try {
+      await addAluno(
+        turmaSelecionada.id,
+        nomeAluno,
+        nomeResponsavel,
+        senhaAluno || '123',
+        matriculaAluno.trim() || undefined
+      );
+      toast.success(`Aluno ${nomeAluno} cadastrado na turma com sucesso!`);
+      setNomeAluno('');
+      setMatriculaAluno('');
+      setNomeResponsavel('');
+      setSenhaAluno('123');
+      setModalNovoAluno(false);
+    } catch (err: any) {
+      const msg = err?.message || 'Falha ao cadastrar aluno.';
+      setErroAluno(msg);
+      toast.error(msg);
+    } finally {
+      setSalvandoAluno(false);
+    }
   };
 
   const abrirEditarAluno = (aluno: Aluno) => {
     setAlunoEditando(aluno);
     setEditNome(aluno.nome);
-    setEditPontos(String(aluno.pontos));
-    setEditPodeComprar(aluno.pode_comprar);
+    setEditMatricula(aluno.matricula || '');
+    setEditSenhaAluno('');
+    const resp = responsaveis.find(r => r.id === aluno.responsavelId);
+    setEditNomeResponsavel(resp?.nome || '');
+    setEditSenhaResponsavel('');
+    setMostrarSenhaAluno(false);
+    setMostrarSenhaResponsavel(false);
+    setErroEditAluno('');
   };
 
   const handleSalvarEdicaoAluno = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!alunoEditando) return;
-    await updateAluno(alunoEditando.id, {
-      nome: editNome.trim() || alunoEditando.nome,
-      pontos: Number(editPontos) || 0,
-      pode_comprar: editPodeComprar,
-    });
-    toast.success('Dados do aluno atualizados com sucesso!');
-    setAlunoEditando(null);
+    setErroEditAluno('');
+
+    const nomeAlunoTrim = editNome.trim();
+    if (!nomeAlunoTrim) {
+      setErroEditAluno('O nome do aluno é obrigatório.');
+      toast.warning('O nome do aluno é obrigatório.');
+      return;
+    }
+
+    const matriculaTrim = editMatricula.trim();
+
+    // Validação de unicidade e duplicidade ignorando o próprio aluno
+    const validacao = validarDuplicidadeAluno(
+      {
+        nome: nomeAlunoTrim,
+        turmaId: alunoEditando.turmaId,
+        matricula: matriculaTrim || undefined,
+      },
+      alunos,
+      alunoEditando.id
+    );
+
+    if (validacao.isDuplicate) {
+      const msg = validacao.message || 'Dados conflitantes com outro aluno já existente.';
+      setErroEditAluno(msg);
+      toast.error(msg);
+      return;
+    }
+
+    // Validação de senha do aluno se informada
+    if (editSenhaAluno.trim() && editSenhaAluno.trim().length < 3) {
+      const msg = 'A nova senha do aluno deve conter no mínimo 3 caracteres.';
+      setErroEditAluno(msg);
+      toast.warning(msg);
+      return;
+    }
+
+    // Validação dos dados do responsável
+    const nomeRespTrim = editNomeResponsavel.trim();
+    if (alunoEditando.responsavelId && !nomeRespTrim) {
+      const msg = 'O nome do responsável é obrigatório.';
+      setErroEditAluno(msg);
+      toast.warning(msg);
+      return;
+    }
+
+    // Validação de senha do responsável se informada
+    if (editSenhaResponsavel.trim() && editSenhaResponsavel.trim().length < 3) {
+      const msg = 'A nova senha do responsável deve conter no mínimo 3 caracteres.';
+      setErroEditAluno(msg);
+      toast.warning(msg);
+      return;
+    }
+
+    setSalvandoAluno(true);
+    try {
+      // 1. Atualizar dados do aluno (preservando rigorosamente turma, saldo, autorização, avatar e vínculos)
+      const alunoPayload: Partial<Aluno> = {
+        nome: nomeAlunoTrim,
+        matricula: matriculaTrim || undefined,
+      };
+      if (editSenhaAluno.trim()) {
+        alunoPayload.senha = editSenhaAluno.trim();
+      }
+      await updateAluno(alunoEditando.id, alunoPayload);
+
+      // 2. Atualizar dados do responsável (se vinculado)
+      if (alunoEditando.responsavelId) {
+        const respPayload: { nome?: string; senha?: string } = {
+          nome: nomeRespTrim,
+        };
+        if (editSenhaResponsavel.trim()) {
+          respPayload.senha = editSenhaResponsavel.trim();
+        }
+        await updateResponsavel(alunoEditando.responsavelId, respPayload);
+      }
+
+      toast.success('Dados do aluno e do responsável atualizados com sucesso!');
+      setAlunoEditando(null);
+    } catch (err: any) {
+      const msg = err?.message || 'Falha ao atualizar dados.';
+      setErroEditAluno(msg);
+      toast.error(msg);
+    } finally {
+      setSalvandoAluno(false);
+    }
   };
 
   return (
@@ -93,13 +237,23 @@ export const TurmasTab: React.FC = () => {
             Gerencie as turmas escolares, alunos cadastrados e seus respectivos responsáveis
           </p>
         </div>
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={() => setModalNovaTurma(true)}
-        >
-          <span>➕</span> Nova Turma
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => setModalImportarAberto(true)}
+            title="Importar alunos por planilha Excel (.xlsx) ou CSV (.csv)"
+          >
+            <span>📥</span> Importar Alunos por Planilha
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => setModalNovaTurma(true)}
+          >
+            <span>➕</span> Nova Turma
+          </button>
+        </div>
       </div>
 
       {/* Grid de seleção de turmas */}
@@ -147,6 +301,19 @@ export const TurmasTab: React.FC = () => {
                   <div>
                     <h4 style={{ margin: 0, fontSize: '15px', fontWeight: 800 }}>
                       {t.serie}º Ano {t.turma}
+                      <span
+                        style={{
+                          marginLeft: '6px',
+                          fontSize: '11px',
+                          padding: '1px 6px',
+                          background: isAtiva ? 'rgba(255,255,255,0.2)' : 'var(--bg-subtle)',
+                          borderRadius: '4px',
+                          color: isAtiva ? '#fff' : 'var(--text-secondary)',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {t.anoLetivo || 2026}
+                      </span>
                     </h4>
                     <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                       {qtd} aluno(s)
@@ -185,13 +352,23 @@ export const TurmasTab: React.FC = () => {
                 Total: {alunosDaTurma.length} estudantes matriculados
               </p>
             </div>
-            <button
-              type="button"
-              className="btn btn-secondary btn--sm"
-              onClick={() => setModalNovoAluno(true)}
-            >
-              <span>➕</span> Adicionar Aluno a esta Turma
-            </button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                className="btn btn-secondary btn--sm"
+                onClick={() => setModalImportarAberto(true)}
+                title={`Importar alunos por planilha`}
+              >
+                <span>📥</span> Importar Planilha
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary btn--sm"
+                onClick={abrirModalNovoAluno}
+              >
+                <span>➕</span> Adicionar Aluno
+              </button>
+            </div>
           </div>
 
           {alunosDaTurma.length === 0 ? (
@@ -202,7 +379,7 @@ export const TurmasTab: React.FC = () => {
                 <button
                   type="button"
                   className="btn btn-primary btn--sm"
-                  onClick={() => setModalNovoAluno(true)}
+                  onClick={abrirModalNovoAluno}
                 >
                   Cadastrar Primeiro Aluno
                 </button>
@@ -232,6 +409,14 @@ export const TurmasTab: React.FC = () => {
                               <strong style={{ display: 'block', color: 'var(--text-primary)' }}>
                                 {aluno.nome}
                               </strong>
+                              {aluno.matricula && (
+                                <span
+                                  className="badge badge-info"
+                                  style={{ fontSize: '11px', marginTop: '2px', display: 'inline-block' }}
+                                >
+                                  Matrícula: {aluno.matricula}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -305,6 +490,22 @@ export const TurmasTab: React.FC = () => {
             />
           </div>
 
+          <div className="form-group">
+            <label className="form-label">Ano Letivo</label>
+            <input
+              type="number"
+              min={2020}
+              max={2035}
+              className="form-input"
+              value={anoLetivoTurma}
+              onChange={e => setAnoLetivoTurma(Number(e.target.value) || 2026)}
+              required
+            />
+            <small style={{ color: 'var(--text-muted)', fontSize: '11px', marginTop: '4px', display: 'block' }}>
+              Permite cadastrar previamente turmas para o ano corrente (2026) ou para o próximo ano letivo (2027).
+            </small>
+          </div>
+
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
             <button
               type="button"
@@ -341,6 +542,20 @@ export const TurmasTab: React.FC = () => {
           </div>
 
           <div className="form-group">
+            <label className="form-label">Matrícula Escolar (opcional)</label>
+            <input
+              type="text"
+              className="form-input"
+              placeholder="Ex: MAT-2024-001 (identificador institucional único)"
+              value={matriculaAluno}
+              onChange={e => setMatriculaAluno(e.target.value)}
+            />
+            <span style={{ fontSize: '11.5px', color: 'var(--text-muted)' }}>
+              Se informada, a matrícula não pode ser duplicada em toda a escola.
+            </span>
+          </div>
+
+          <div className="form-group">
             <label className="form-label">Nome do Responsável Legal</label>
             <input
               type="text"
@@ -363,77 +578,245 @@ export const TurmasTab: React.FC = () => {
             />
           </div>
 
+          {erroAluno && (
+            <div className="alert alert-danger" style={{ marginBottom: '14px', fontSize: '13px' }}>
+              <span>⚠️ {erroAluno}</span>
+            </div>
+          )}
+
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
             <button
               type="button"
               className="btn btn-secondary"
               onClick={() => setModalNovoAluno(false)}
+              disabled={salvandoAluno}
             >
               Cancelar
             </button>
-            <button type="submit" className="btn btn-primary">
-              Cadastrar Aluno
+            <button type="submit" className="btn btn-primary" disabled={salvandoAluno}>
+              {salvandoAluno ? 'Cadastrando...' : 'Cadastrar Aluno'}
             </button>
           </div>
         </form>
       </Modal>
 
-      {/* Modal Editar Aluno */}
+      {/* Modal Editar Aluno e Responsável */}
       <Modal
         isOpen={!!alunoEditando}
         onClose={() => setAlunoEditando(null)}
-        title="Editar Aluno"
-        subtitle="Ajuste o nome, saldo ou permissão do aluno"
+        title="Editar Aluno e Responsável"
+        subtitle="Ajuste os dados cadastrais do aluno e do responsável associado"
+        maxWidth="580px"
       >
         <form onSubmit={handleSalvarEdicaoAluno}>
-          <div className="form-group">
-            <label className="form-label">Nome do Aluno</label>
-            <input
-              type="text"
-              className="form-input"
-              value={editNome}
-              onChange={e => setEditNome(e.target.value)}
-              required
-            />
-          </div>
+          {/* SEÇÃO 1: Dados do Aluno */}
+          <div
+            style={{
+              background: 'var(--bg-subtle)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '14px',
+              padding: '16px 18px',
+              marginBottom: '16px',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginBottom: '14px',
+                paddingBottom: '8px',
+                borderBottom: '1px solid var(--border-color)',
+              }}
+            >
+              <span style={{ fontSize: '18px' }}>👤</span>
+              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: 'var(--text-color)' }}>
+                Dados do Aluno
+              </h3>
+            </div>
 
-          <div className="form-group">
-            <label className="form-label">Saldo de PoloCoins 🪙</label>
-            <input
-              type="number"
-              min="0"
-              className="form-input"
-              value={editPontos}
-              onChange={e => setEditPontos(e.target.value)}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontWeight: 700 }}>
+            {/* Nome do Aluno */}
+            <div className="form-group" style={{ marginBottom: '12px' }}>
+              <label className="form-label">
+                Nome do Aluno <span style={{ color: 'var(--color-danger)' }}>*</span>
+              </label>
               <input
-                type="checkbox"
-                checked={editPodeComprar}
-                onChange={e => setEditPodeComprar(e.target.checked)}
+                type="text"
+                className="form-input"
+                placeholder="Nome completo do aluno"
+                value={editNome}
+                onChange={e => setEditNome(e.target.value)}
+                required
               />
-              <span>Aluno autorizado a comprar diretamente na Loja PoloCoin</span>
-            </label>
+            </div>
+
+            {/* Matrícula Escolar */}
+            <div className="form-group" style={{ marginBottom: '12px' }}>
+              <label className="form-label">Matrícula Escolar</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Ex: MAT-2024-001"
+                value={editMatricula}
+                onChange={e => setEditMatricula(e.target.value)}
+              />
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                Identificador escolar único no sistema (opcional).
+              </span>
+            </div>
+
+            {/* Nova Senha do Aluno */}
+            <div className="form-group" style={{ marginBottom: '4px' }}>
+              <label className="form-label">Nova Senha do Aluno (opcional)</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={mostrarSenhaAluno ? 'text' : 'password'}
+                  className="form-input"
+                  placeholder="Deixe em branco para manter a senha atual"
+                  value={editSenhaAluno}
+                  onChange={e => setEditSenhaAluno(e.target.value)}
+                  style={{ paddingRight: '40px' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setMostrarSenhaAluno(!mostrarSenhaAluno)}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    padding: '4px',
+                    opacity: 0.75,
+                  }}
+                  title={mostrarSenhaAluno ? 'Ocultar senha' : 'Ver senha'}
+                >
+                  {mostrarSenhaAluno ? '🙈' : '👁️'}
+                </button>
+              </div>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                Deixe em branco para manter a senha atual.
+              </span>
+            </div>
           </div>
+
+          {/* SEÇÃO 2: Dados do Responsável */}
+          <div
+            style={{
+              background: 'var(--bg-subtle)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '14px',
+              padding: '16px 18px',
+              marginBottom: '16px',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginBottom: '14px',
+                paddingBottom: '8px',
+                borderBottom: '1px solid var(--border-color)',
+              }}
+            >
+              <span style={{ fontSize: '18px' }}>👨‍👩‍👧</span>
+              <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 800, color: 'var(--text-color)' }}>
+                Dados do Responsável
+              </h3>
+            </div>
+
+            {/* Nome do Responsável */}
+            <div className="form-group" style={{ marginBottom: '12px' }}>
+              <label className="form-label">
+                Nome do Responsável {alunoEditando?.responsavelId && <span style={{ color: 'var(--color-danger)' }}>*</span>}
+              </label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Nome completo do responsável"
+                value={editNomeResponsavel}
+                onChange={e => setEditNomeResponsavel(e.target.value)}
+                required={!!alunoEditando?.responsavelId}
+              />
+            </div>
+
+            {/* Nova Senha do Responsável */}
+            <div className="form-group" style={{ marginBottom: '4px' }}>
+              <label className="form-label">Nova Senha do Responsável (opcional)</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={mostrarSenhaResponsavel ? 'text' : 'password'}
+                  className="form-input"
+                  placeholder="Deixe em branco para manter a senha atual"
+                  value={editSenhaResponsavel}
+                  onChange={e => setEditSenhaResponsavel(e.target.value)}
+                  style={{ paddingRight: '40px' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setMostrarSenhaResponsavel(!mostrarSenhaResponsavel)}
+                  style={{
+                    position: 'absolute',
+                    right: '10px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    padding: '4px',
+                    opacity: 0.75,
+                  }}
+                  title={mostrarSenhaResponsavel ? 'Ocultar senha' : 'Ver senha'}
+                >
+                  {mostrarSenhaResponsavel ? '🙈' : '👁️'}
+                </button>
+              </div>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                Deixe em branco para manter a senha atual.
+              </span>
+            </div>
+
+            {alunoEditando?.responsavelId && (
+              <div style={{ marginTop: '10px', fontSize: '11.5px', color: 'var(--text-muted)' }}>
+                ℹ️ <em>A alteração dos dados do responsável é compartilhada com todos os alunos vinculados à mesma conta familiar.</em>
+              </div>
+            )}
+          </div>
+
+          {erroEditAluno && (
+            <div className="alert alert-danger" style={{ marginBottom: '14px', fontSize: '13px' }}>
+              <span>⚠️ {erroEditAluno}</span>
+            </div>
+          )}
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
             <button
               type="button"
               className="btn btn-secondary"
               onClick={() => setAlunoEditando(null)}
+              disabled={salvandoAluno}
             >
               Cancelar
             </button>
-            <button type="submit" className="btn btn-primary">
-              Salvar Alterações
+            <button type="submit" className="btn btn-primary" disabled={salvandoAluno}>
+              {salvandoAluno ? 'Salvando...' : 'Salvar Alterações'}
             </button>
           </div>
         </form>
       </Modal>
+
+      {/* Modal de Importação em Massa por Planilha */}
+      <ImportarPlanilhaModal
+        isOpen={modalImportarAberto}
+        onClose={() => setModalImportarAberto(false)}
+        tipo="alunos"
+        turmaIdPadrao={turmaSelecionada?.id}
+      />
     </div>
   );
 };

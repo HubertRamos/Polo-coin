@@ -12,6 +12,26 @@ export interface Turma {
   id: number;
   serie: number;
   turma: string; // 'A', 'B', etc.
+  anoLetivo: number; // e.g. 2026, 2027
+}
+
+export interface MovimentacaoAluno {
+  id: number;
+  alunoId: number;
+  alunoNome: string;
+  alunoMatricula?: string;
+  turmaOrigemId: number;
+  turmaOrigemNome: string;
+  anoLetivoOrigem: number;
+  turmaDestinoId: number;
+  turmaDestinoNome: string;
+  anoLetivoDestino: number;
+  tipo: 'transferencia' | 'progressao';
+  dataHora: string; // ISO ou formatada
+  adminNome: string;
+  loteId: string;
+  motivo?: string;
+  resultado: 'sucesso' | 'falha';
 }
 
 export interface Professor {
@@ -31,6 +51,7 @@ export interface Aluno {
   pontos: number;
   pode_comprar: boolean;
   senha?: string;
+  matricula?: string;
 }
 
 export interface Responsavel {
@@ -47,6 +68,7 @@ export interface Produto {
   categoria: string;
   imagem?: string;
   estoque?: number;
+  codigo?: string;
 }
 
 export interface Categoria {

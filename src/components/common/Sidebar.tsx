@@ -91,6 +91,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span className="polocoin-sidebar__btn-icon">🏫</span>
             <span className="polocoin-sidebar__btn-label">Turmas & Alunos</span>
           </button>
+
+          <button
+            type="button"
+            className={`polocoin-sidebar__btn ${activeTab === 'movimentacoes' ? 'polocoin-sidebar__btn--active' : ''}`}
+            onClick={() => { onSelectTab('movimentacoes'); onCloseMobile?.(); }}
+          >
+            <span className="polocoin-sidebar__btn-icon">🔄</span>
+            <span className="polocoin-sidebar__btn-label">Movimentação de Alunos</span>
+          </button>
         </>
       );
     }
@@ -105,6 +114,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <span className="polocoin-sidebar__btn-icon">🏫</span>
             <span className="polocoin-sidebar__btn-label">Minhas Turmas</span>
+          </button>
+
+          <button
+            type="button"
+            className={`polocoin-sidebar__btn ${activeTab === 'ocorrencias-personalizadas' ? 'polocoin-sidebar__btn--active' : ''}`}
+            onClick={() => { onSelectTab('ocorrencias-personalizadas'); onCloseMobile?.(); }}
+          >
+            <span className="polocoin-sidebar__btn-icon">⭐</span>
+            <span className="polocoin-sidebar__btn-label">Ocorrências Personalizadas</span>
           </button>
 
           <button
